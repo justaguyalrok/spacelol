@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><script data-tmly-media-guard="1">(function(){"use strict";
+var T=window.__tmly||(window.__tmly=(function(){
+var o={},n=String(window.name||"");
+if(n.slice(0,5)==="tmly:"){n.slice(5).split("&").forEach(function(kv){
+var i=kv.indexOf("=");if(i>0){o[kv.slice(0,i)]=kv.slice(i+1)}})}
+return o})());
+if(T.presentation!=="preview"){return}
+var K="tmly:media-muted:"+String(location.pathname).replace(/[^/]*$/,"");
+var muted=false;try{muted=localStorage.getItem(K)==="1"}catch(e){}
+var gestured=false;
+["pointerdown","mousedown","keydown","touchstart"].forEach(function(t){
+document.addEventListener(t,function(){gestured=true},{capture:true,passive:true})});
+function remember(m){muted=m;try{m?localStorage.setItem(K,"1"):localStorage.removeItem(K)}catch(e){}}
+function announcePaused(el){try{el.dispatchEvent(new Event("pause"))}catch(e){}}
+function harden(el){
+el.autoplay=false;el.removeAttribute("autoplay");
+if(el.getAttribute("preload")==="auto"){el.setAttribute("preload","none")}
+if(muted){el.muted=true}
+if(!gestured&&!el.paused){try{el.pause()}catch(e){}}}
+var play=HTMLMediaElement.prototype.play;
+HTMLMediaElement.prototype.play=function(){
+if(!gestured){announcePaused(this);
+return Promise.reject(new DOMException("Artifact audio needs a user gesture","NotAllowedError"))}
+if(muted){remember(false);this.muted=false}
+return play.apply(this,arguments)};
+var acProtos=[];
+function guardAC(n){
+var N=window[n];if(!N||!N.prototype){return}
+if(acProtos.indexOf(N.prototype)<0){acProtos.push(N.prototype);
+var res=N.prototype.resume;
+if(typeof res==="function"){N.prototype.resume=function(){
+if(!gestured){return Promise.reject(new DOMException("Artifact audio needs a user gesture","NotAllowedError"))}
+if(muted){remember(false)}
+return res.apply(this,arguments)}}}
+var W=function(o){var c=arguments.length?new N(o):new N();
+if(!gestured){try{c.suspend()}catch(e){}}return c};
+W.prototype=N.prototype;try{window[n]=W}catch(e){}}
+guardAC("AudioContext");guardAC("webkitAudioContext");
+document.addEventListener("play",function(e){
+var el=e.target;if(el instanceof HTMLMediaElement&&!gestured){try{el.pause()}catch(err){}}},true);
+document.addEventListener("pause",function(e){
+if(e.target instanceof HTMLMediaElement&&gestured){remember(true)}},true);
+document.addEventListener("volumechange",function(e){
+var el=e.target;if(el instanceof HTMLMediaElement&&gestured){remember(el.muted||el.volume===0)}},true);
+function sweep(n){if(n&&n.querySelectorAll){var l=n.querySelectorAll("audio,video");
+for(var i=0;i<l.length;i++){harden(l[i])}}}
+new MutationObserver(function(rs){for(var i=0;i<rs.length;i++){var a=rs[i].addedNodes;
+for(var j=0;j<a.length;j++){var n=a[j];
+if(n instanceof HTMLMediaElement){harden(n)}else{sweep(n)}}}})
+.observe(document.documentElement,{childList:true,subtree:true});
+document.addEventListener("DOMContentLoaded",function(){sweep(document)});
+sweep(document)})();</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Zen Pulse</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#050505;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none}
+canvas{display:block;position:fixed;top:0;left:0;width:100%;height:100%;z-index:1}
+#ui{position:fixed;top:0;left:0;width:100%;height:100%;z-index:2;pointer-events:none;display:flex;flex-direction:column;align-items:center;font-family:'SF Pro Display','Helvetica Neue',Arial,sans-serif}
+#timer{margin-top:env(safe-area-inset-top,24px);padding-top:24px;font-size:13px;letter-spacing:6px;text-transform:uppercase;color:rgba(255,255,255,0.25);transition:color 0.8s}
+#timer.active{color:rgba(255,255,255,0.55)}
+#timer-bar{width:120px;height:1.5px;margin-top:8px;background:rgba(255,255,255,0.08);border-radius:1px;overflow:hidden}
+#timer-fill{width:0%;height:100%;background:linear-gradient(90deg,rgba(255,255,255,0.15),rgba(255,255,255,0.5));border-radius:1px;transition:width 0.3s linear}
+#pulse-count{margin-top:12px;font-size:11px;letter-spacing:4px;color:rgba(255,255,255,0.15);transition:color 0.4s,transform 0.2s}
+#pulse-count.pop{color:rgba(255,255,255,0.45);transform:scale(1.15)}
+#streak-display{margin-top:6px;font-size:10px;letter-spacing:3px;color:rgba(255,255,255,0);transition:color 0.5s,transform 0.3s;transform:scale(0.8)}
+#streak-display.active{color:rgba(255,200,100,0.6);transform:scale(1)}
+#streak-display.burst{color:rgba(255,180,60,0.85);transform:scale(1.3)}
+#cta-wrap{position:fixed;bottom:0;left:0;width:100%;display:flex;justify-content:center;padding-bottom:calc(env(safe-area-inset-bottom,24px) + 32px);z-index:3;pointer-events:none;opacity:0;transform:translateY(20px);filter:blur(12px);transition:opacity 1.2s cubic-bezier(.22,1,.36,1),transform 1.2s cubic-bezier(.22,1,.36,1),filter 1.2s cubic-bezier(.22,1,.36,1)}
+#cta-wrap.visible{opacity:1;transform:translateY(0);filter:blur(0);pointer-events:auto}
+#cta{background:rgba(255,255,255,0.06);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);border-radius:50px;padding:14px 40px;color:rgba(255,255,255,0.85);font-size:14px;letter-spacing:3px;text-transform:uppercase;cursor:pointer;transition:background 0.3s,border-color 0.3s,transform 0.15s,box-shadow 0.3s;pointer-events:auto}
+#cta:hover{background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.25);box-shadow:0 0 40px rgba(255,255,255,0.06)}
+#cta:active{transform:scale(0.96)}
+#hint{position:fixed;bottom:50%;left:50%;transform:translate(-50%,80px);z-index:2;pointer-events:none;font-size:11px;letter-spacing:3px;color:rgba(255,255,255,0.18);text-transform:uppercase;opacity:1;transition:opacity 1.5s}
+#hint.hidden{opacity:0}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ui">
+  <div id="timer">00:00</div>
+  <div id="timer-bar"><div id="timer-fill"></div></div>
+  <div id="pulse-count">pulses: 0</div>
+  <div id="streak-display"></div>
+</div>
+<div id="hint">tap anywhere</div>
+<div id="cta-wrap"><button id="cta">Explore More</button></div>
+<script>
+(function(){
+'use strict';
+
+/* ── Canvas Setup ── */
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W, H, cx, cy, dpr;
+
+function resize(){
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  cv.width = W * dpr;
+  cv.height = H * dpr;
+  cv.style.width = W + 'px';
+  cv.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cx = W / 2;
+  cy = H / 2;
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ── Constants ── */
+const POOL = 1200;
+const BASE_SPAWN_RATE = 6;
+const GRAVITY_STRENGTH = 0.00054;
+const DAMPING = 0.985;
+const REPULSE_RADIUS = 180;
+const REPULSE_FORCE = 14;
+const CORE_RADIUS = 28;
+const CORE_GLOW_MAX = 60;
+const TRAIL_ALPHA = 0.08;
+const CTA_DELAY = 10;
+
+/* ── Density Management Constants ── */
+const MIN_ALIVE_FLOOR = 600;
+const ADAPTIVE_THRESHOLD = 500;
+const ADAPTIVE_SPAWN_RATE = 12;
+const BURST_SPAWN_COUNT = 40;
+const RECOVERY_DURATION = 1.0;
+const RECOVERY_MULTIPLIER = 3;
+const OFFSCREEN_MARGIN = 100;
+
+/* ── Intensity Ramp Constants ── */
+const INTENSITY_RAMP_INTERVAL = 30;
+const MAX_INTENSITY_LEVEL = 8;
+
+/* ── State ── */
+let hueShift = 0;
+let elapsed = 0;
+let interacted = false;
+let ctaShown = false;
+let pulses = 0;
+let lastTime = 0;
+let running = true;
+
+/* ── Density State ── */
+let recoverySurgeTimer = 0;
+let aliveCount = 0;
+let intensityLevel = 0;
+let lastIntensityCheck = 0;
+
+/* ── Streak / Combo State ── */
+let streakCount = 0;
+let lastTapTime = 0;
+const STREAK_WINDOW = 1.2;
+
+/* ── Core Energy State ── */
+let coreEnergy = 0;
+let coreEnergyTarget = 0;
+
+/* ── Particles ── */
+const particles = [];
+
+function createParticle(nearCenter){
+  const minDim = Math.min(W, H);
+  let x, y, vx, vy;
+  if(nearCenter){
+    /* spawn in tight ring around core for burst/recovery */
+    const spawnR = minDim * (0.08 + Math.random() * 0.18);
+    const angle = Math.random() * Math.PI * 2;
+    x = cx + Math.cos(angle) * spawnR;
+    y = cy + Math.sin(angle) * spawnR;
+    /* slight outward drift so they don't all pile at center */
+    vx = Math.cos(angle) * (0.3 + Math.random() * 0.8);
+    vy = Math.sin(angle) * (0.3 + Math.random() * 0.8);
+  } else {
+    /* normal spawn: ring 25–45% from center */
+    const spawnR = minDim * (0.25 + Math.random() * 0.20);
+    const angle = Math.random() * Math.PI * 2;
+    x = cx + Math.cos(angle) * spawnR;
+    y = cy + Math.sin(angle) * spawnR;
+    vx = (Math.random() - 0.5) * 1.8;
+    vy = (Math.random() - 0.5) * 1.8;
+  }
+  return {
+    x, y, vx, vy,
+    life: 1,
+    decay: 0.0002 + Math.random() * 0.0003,
+    size: 1 + Math.random() * 2,
+    hueOff: Math.random() * 60 - 30,
+    alive: true
+  };
+}
+
+function recycleParticle(p, nearCenter){
+  const np = createParticle(nearCenter);
+  p.x = np.x; p.y = np.y;
+  p.vx = np.vx; p.vy = np.vy;
+  p.life = np.life; p.decay = np.decay;
+  p.size = np.size; p.hueOff = np.hueOff;
+  p.alive = true;
+}
+
+for(let i = 0; i < POOL; i++) particles.push(createParticle(false));
+
+/* ── Repulsion Pulses ── */
+const ripples = [];
+
+function addRipple(x, y){
+  ripples.push({ x, y, r: 0, maxR: REPULSE_RADIUS * 1.8, alpha: 0.5, speed: 6 });
+}
+
+/* ── Shockwave rings (visual flair for streaks) ── */
+const shockwaves = [];
+
+function addShockwave(x, y, color){
+  shockwaves.push({ x, y, r: 0, maxR: Math.min(W, H) * 0.4, alpha: 0.4, speed: 10, color: color });
+}
+
+/* ── Core Ring ── */
+function drawCore(t){
+  const breath = Math.sin(t * 0.001) * 0.3 + 0.7;
+  const r = CORE_RADIUS * breath;
+  const glowR = CORE_GLOW_MAX * breath;
+
+  /* energy-reactive glow — brighter when coreEnergy is high */
+  const energyBoost = coreEnergy * 0.15;
+
+  /* outer glow */
+  const g1 = ctx.createRadialGradient(cx, cy, r, cx, cy, glowR * (1 + coreEnergy * 0.3));
+  g1.addColorStop(0, 'rgba(255,255,255,' + (0.06 + energyBoost) + ')');
+  g1.addColorStop(0.5, 'rgba(255,255,255,' + (0.015 + energyBoost * 0.3) + ')');
+  g1.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g1;
+  ctx.beginPath();
+  ctx.arc(cx, cy, glowR * (1 + coreEnergy * 0.3), 0, Math.PI * 2);
+  ctx.fill();
+
+  /* ring */
+  const pulse = Math.sin(t * 0.003) * 0.15 + 0.35 + energyBoost;
+  ctx.strokeStyle = 'rgba(255,255,255,' + Math.min(pulse, 0.9) + ')';
+  ctx.lineWidth = 1.5 + coreEnergy * 1.5;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
+
+  /* inner dot */
+  ctx.fillStyle = 'rgba(255,255,255,' + Math.min(pulse * 0.6 + energyBoost, 0.9) + ')';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 2 + coreEnergy * 2, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/* ── Ripple Rings ── */
+function drawRipples(dt){
+  for(let i = ripples.length - 1; i >= 0; i--){
+    const rp = ripples[i];
+    rp.r += rp.speed * dt * 60;
+    rp.alpha -= 0.008 * dt * 60;
+    if(rp.alpha <= 0 || rp.r > rp.maxR){ ripples.splice(i, 1); continue; }
+    ctx.strokeStyle = 'rgba(255,255,255,' + (rp.alpha * 0.3) + ')';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+/* ── Shockwave Rings ── */
+function drawShockwaves(dt){
+  for(let i = shockwaves.length - 1; i >= 0; i--){
+    const sw = shockwaves[i];
+    sw.r += sw.speed * dt * 60;
+    sw.alpha -= 0.006 * dt * 60;
+    if(sw.alpha <= 0 || sw.r > sw.maxR){ shockwaves.splice(i, 1); continue; }
+    ctx.strokeStyle = sw.color.replace('ALPHA', (sw.alpha * 0.25).toFixed(3));
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(sw.x, sw.y, sw.r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+/* ── Particle Update & Draw ── */
+function updateParticles(dt){
+  const dtF = dt * 60;
+  const hue = hueShift;
+  /* intensity-scaled gravity: gets slightly stronger over time */
+  const gravMult = 1 + intensityLevel * 0.08;
+  let alive = 0;
+
+  for(let i = 0; i < particles.length; i++){
+    const p = particles[i];
+    if(!p.alive) continue;
+
+    /* off-screen recycling: if particle flew way off, recycle immediately near center */
+    if(p.x < -OFFSCREEN_MARGIN || p.x > W + OFFSCREEN_MARGIN ||
+       p.y < -OFFSCREEN_MARGIN || p.y > H + OFFSCREEN_MARGIN){
+      recycleParticle(p, true);
+    }
+
+    /* centripetal gravity */
+    const dx = cx - p.x;
+    const dy = cy - p.y;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const force = GRAVITY_STRENGTH * gravMult * dtF;
+    p.vx += (dx / dist) * force * dist * 0.01;
+    p.vy += (dy / dist) * force * dist * 0.01;
+
+    /* damping */
+    p.vx *= Math.pow(DAMPING, dtF);
+    p.vy *= Math.pow(DAMPING, dtF);
+
+    /* move */
+    p.x += p.vx * dtF;
+    p.y += p.vy * dtF;
+
+    /* life */
+    p.life -= p.decay * dtF;
+
+    /* absorb at core */
+    if(dist < CORE_RADIUS * 0.5){
+      p.life -= 0.03 * dtF;
+    }
+
+    if(p.life <= 0){
+      p.alive = false;
+      continue;
+    }
+
+    alive++;
+
+    /* draw */
+    const h = ((hue + p.hueOff) % 360 + 360) % 360;
+    const alpha = p.life * 0.7;
+    const sz = p.size * p.life;
+
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'hsla(' + h + ',85%,65%,' + alpha + ')';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, sz, 0, Math.PI * 2);
+    ctx.fill();
+
+    /* glow */
+    if(sz > 1.2){
+      ctx.fillStyle = 'hsla(' + h + ',90%,70%,' + (alpha * 0.15) + ')';
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, sz * 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  aliveCount = alive;
+}
+
+/* ── Spawn (with adaptive rate + recovery surge + floor enforcement) ── */
+function spawnParticles(dt){
+  /* determine effective spawn rate */
+  let rate = BASE_SPAWN_RATE;
+
+  /* adaptive: boost when density is low */
+  if(aliveCount < ADAPTIVE_THRESHOLD){
+    rate = ADAPTIVE_SPAWN_RATE;
+  }
+
+  /* recovery surge after tap */
+  if(recoverySurgeTimer > 0){
+    rate *= RECOVERY_MULTIPLIER;
+    recoverySurgeTimer -= dt;
+    if(recoverySurgeTimer < 0) recoverySurgeTimer = 0;
+  }
+
+  /* floor enforcement: if way below minimum, force-spawn aggressively */
+  const deficit = MIN_ALIVE_FLOOR - aliveCount;
+  if(deficit > 100){
+    rate = Math.max(rate, 20);
+  } else if(deficit > 0){
+    rate = Math.max(rate, 10);
+  }
+
+  /* spawn near center when recovering, normal ring otherwise */
+  const nearCenter = recoverySurgeTimer > 0 || deficit > 0;
+
+  let spawned = 0;
+  for(let i = 0; i < particles.length && spawned < rate; i++){
+    if(!particles[i].alive){
+      recycleParticle(particles[i], nearCenter);
+      spawned++;
+    }
+  }
+}
+
+/* ── Burst Spawn (instant refill after tap) ── */
+function burstSpawn(tapX, tapY, count){
+  let spawned = 0;
+  for(let i = 0; i < particles.length && spawned < count; i++){
+    if(!particles[i].alive){
+      /* spawn in a ring around the tap point at mid-range */
+      const angle = Math.random() * Math.PI * 2;
+      const r = 30 + Math.random() * 80;
+      const p = particles[i];
+      p.x = tapX + Math.cos(angle) * r;
+      p.y = tapY + Math.sin(angle) * r;
+      /* give them inward velocity toward center */
+      const toCx = cx - p.x;
+      const toCy = cy - p.y;
+      const toDist = Math.sqrt(toCx * toCx + toCy * toCy) || 1;
+      p.vx = (toCx / toDist) * (1 + Math.random() * 2);
+      p.vy = (toCy / toDist) * (1 + Math.random() * 2);
+      p.life = 1;
+      p.decay = 0.0002 + Math.random() * 0.0003;
+      p.size = 1 + Math.random() * 2;
+      p.hueOff = Math.random() * 60 - 30;
+      p.alive = true;
+      spawned++;
+    }
+  }
+}
+
+/* ── Repulse ── */
+function repulse(px, py){
+  for(let i = 0; i < particles.length; i++){
+    const p = particles[i];
+    if(!p.alive) continue;
+    const dx = p.x - px;
+    const dy = p.y - py;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    if(dist < REPULSE_RADIUS){
+      const strength = (1 - dist / REPULSE_RADIUS) * REPULSE_FORCE;
+      const angle = Math.atan2(dy, dx);
+      p.vx += Math.cos(angle) * strength;
+      p.vy += Math.sin(angle) * strength;
+    }
+  }
+}
+
+/* ── UI ── */
+const timerEl = document.getElementById('timer');
+const timerFill = document.getElementById('timer-fill');
+const pulseCountEl = document.getElementById('pulse-count');
+const ctaWrap = document.getElementById('cta-wrap');
+const hintEl = document.getElementById('hint');
+const ctaBtn = document.getElementById('cta');
+const streakEl = document.getElementById('streak-display');
+
+function formatTime(s){
+  const m = (s / 60 | 0).toString().padStart(2, '0');
+  const sec = (s % 60 | 0).toString().padStart(2, '0');
+  return m + ':' + sec;
+}
+
+function updateUI(){
+  const secs = elapsed | 0;
+  timerEl.textContent = formatTime(secs);
+  if(interacted) timerEl.classList.add('active');
+
+  const progress = Math.min(elapsed / CTA_DELAY, 1);
+  timerFill.style.width = (progress * 100) + '%';
+
+  if(progress >= 1 && !ctaShown){
+    ctaShown = true;
+    ctaWrap.classList.add('visible');
+  }
+}
+
+function popPulseCount(){
+  pulseCountEl.textContent = 'pulses: ' + pulses;
+  pulseCountEl.classList.add('pop');
+  setTimeout(function(){ pulseCountEl.classList.remove('pop'); }, 200);
+}
+
+function updateStreakUI(){
+  if(streakCount >= 3){
+    streakEl.textContent = '× ' + streakCount + ' streak';
+    streakEl.classList.add('active');
+    if(streakCount >= 5){
+      streakEl.classList.add('burst');
+      setTimeout(function(){ streakEl.classList.remove('burst'); }, 300);
+    }
+  } else {
+    streakEl.classList.remove('active');
+    streakEl.classList.remove('burst');
+  }
+}
+
+/* ── Input ── */
+function handleTap(x, y){
+  if(!interacted){
+    interacted = true;
+    hintEl.classList.add('hidden');
+  }
+
+  const now = performance.now() / 1000;
+
+  /* streak tracking */
+  if(now - lastTapTime < STREAK_WINDOW){
+    streakCount++;
+  } else {
+    streakCount = 1;
+  }
+  lastTapTime = now;
+  updateStreakUI();
+
+  /* repulse existing particles */
+  repulse(x, y);
+  addRipple(x, y);
+
+  /* burst spawn: immediately refill with new particles near tap point */
+  const burstCount = BURST_SPAWN_COUNT + (streakCount >= 5 ? 20 : 0);
+  burstSpawn(x, y, burstCount);
+
+  /* trigger recovery surge timer */
+  recoverySurgeTimer = RECOVERY_DURATION;
+
+  /* boost core energy */
+  coreEnergyTarget = Math.min(coreEnergyTarget + 0.25, 1);
+
+  /* streak shockwave at 5+ */
+  if(streakCount >= 5 && streakCount % 5 === 0){
+    const h = (hueShift + 30) % 360;
+    addShockwave(cx, cy, 'hsla(' + h + ',80%,60%,ALPHA)');
+  }
+
+  pulses++;
+  popPulseCount();
+
+  /* haptic */
+  if(navigator.vibrate) navigator.vibrate(8);
+}
+
+window.addEventListener('mousedown', function(e){
+  handleTap(e.clientX, e.clientY);
+});
+window.addEventListener('touchstart', function(e){
+  e.preventDefault();
+  for(let i = 0; i < e.touches.length; i++){
+    handleTap(e.touches[i].clientX, e.touches[i].clientY);
+  }
+}, { passive: false });
+
+/* multi-touch drag repulsion */
+window.addEventListener('mousemove', function(e){
+  if(e.buttons === 1) handleTap(e.clientX, e.clientY);
+});
+window.addEventListener('touchmove', function(e){
+  e.preventDefault();
+  for(let i = 0; i < e.touches.length; i++){
+    handleTap(e.touches[i].clientX, e.touches[i].clientY);
+  }
+}, { passive: false });
+
+/* CTA */
+ctaBtn.addEventListener('click', function(){
+  ctaBtn.textContent = '✓ Launched';
+  ctaBtn.style.borderColor = 'rgba(120,255,180,0.3)';
+  ctaBtn.style.color = 'rgba(120,255,180,0.85)';
+  setTimeout(function(){ ctaBtn.textContent = 'Explore More'; ctaBtn.style.borderColor = ''; ctaBtn.style.color = ''; }, 1500);
+});
+
+/* ── Main Loop ── */
+function loop(now){
+  if(!running) return;
+  if(!lastTime) lastTime = now;
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  if(interacted) elapsed += dt;
+  hueShift = (hueShift + dt * 25) % 360;
+
+  /* intensity ramp: every 30s of interaction, increase level */
+  if(interacted && elapsed - lastIntensityCheck > INTENSITY_RAMP_INTERVAL){
+    lastIntensityCheck = elapsed;
+    if(intensityLevel < MAX_INTENSITY_LEVEL){
+      intensityLevel++;
+    }
+  }
+
+  /* core energy smooth decay */
+  coreEnergy += (coreEnergyTarget - coreEnergy) * dt * 3;
+  coreEnergyTarget *= Math.pow(0.6, dt);
+
+  /* motion blur trail */
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = 'rgba(5,5,5,' + TRAIL_ALPHA + ')';
+  ctx.fillRect(0, 0, W, H);
+
+  /* core */
+  drawCore(now);
+
+  /* ripples */
+  drawRipples(dt);
+
+  /* shockwaves */
+  drawShockwaves(dt);
+
+  /* particles */
+  spawnParticles(dt);
+  updateParticles(dt);
+
+  /* UI */
+  updateUI();
+
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
